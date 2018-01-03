@@ -1,9 +1,8 @@
 """
 """
 
-import numpy as np
-
 import rasterio
+from rio_rgbify import encoders
 from rio_tiler.utils import array_to_img
 
 from lambda_proxy.proxy import API
@@ -13,15 +12,7 @@ APP = API(app_name="terrain-tiler")
 TERRAIN_BUCKET = 's3://elevation-tiles-prod'
 
 
-def mapbox_encoded_rgb(value):
-    value = np.clip(value + 10000, 0.0, 65535.0)
-    r = (value / 256)
-    g = (value % 256)
-    b = ((value * 256) % 256)
-    return np.stack([r, g, b]).astype(np.uint8)
-
-
-@APP.route('tiles/<int:z>/<int:x>/<int:y>.png', methods=['GET'], cors=True)
+@APP.route('/tiles/<int:z>/<int:x>/<int:y>.png', methods=['GET'], cors=True)
 def mapbox_tile(tile_z, tile_x, tile_y):
     """
     Handle tile requests
@@ -36,7 +27,7 @@ def mapbox_tile(tile_z, tile_x, tile_y):
     with rasterio.open(address) as src:
         arr = src.read(indexes=1,
                        out_shape=(tilesize, tilesize)).astype(src.profile['dtype'])
-        rgb = mapbox_encoded_rgb(arr)
+        rgb = encoders.data_to_rgb(arr, -10000, 0.1)
 
     tile = array_to_img(rgb, 'png', nodata=None)
 
