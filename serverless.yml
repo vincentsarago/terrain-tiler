@@ -1,4 +1,4 @@
-service: tiler
+service: terrain-tiler
 
 provider:
   name: aws
@@ -15,11 +15,11 @@ provider:
        - "arn:aws:s3:::elevation-tiles-prod/*"
 
   environment:
-    GDAL_CACHEMAX: 75%
-    GDAL_TIFF_OVR_BLOCKSIZE: 512
+    GDAL_CACHEMAX: 512
     VSI_CACHE: TRUE
     VSI_CACHE_SIZE: 536870912
-    GDAL_DISABLE_READDIR_ON_OPEN: true
+    CPL_TMPDIR: "/tmp"
+    GDAL_DISABLE_READDIR_ON_OPEN: "EMPTY_DIR"
     CPL_VSIL_CURL_ALLOWED_EXTENSIONS: ".tif"
 
 custom:
@@ -34,8 +34,8 @@ package:
   artifact: package.zip
 
 functions:
-  landsat-tiler:
-    handler: app.elevation.APP
+  app:
+    handler: tiler.elevation.APP
     memorySize: 1536
     timeout: 20
     events:

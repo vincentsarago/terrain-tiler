@@ -1,14 +1,11 @@
 # terrain-tiler
 
-#### AWS Lambda + Elevation AWS PDS = landsat-tiler
+#### AWS Lambda + Elevation AWS PDS = terrain-tiler
 
 https://aws.amazon.com/fr/public-datasets/terrain/
 
 
 # Info
-
-
----
 
 # Installation
 
@@ -22,9 +19,11 @@ https://aws.amazon.com/fr/public-datasets/terrain/
 
 ```bash
 # Build Amazon linux AMI docker container + Install Python modules + create package
-git clone https://github.com/vincentsarago/terrain-tiler.git
-cd terrain-tiler/
-make all
+$ git clone https://github.com/developmentseed/terrain-tiler.git
+$ cd terrain-tiler/
+
+$ docker login
+$ make package
 ```
 
 #### Deploy to AWS

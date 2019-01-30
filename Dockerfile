@@ -1,53 +1,39 @@
-# Use the official amazonlinux AMI image
-FROM amazonlinux:latest
+FROM remotepixel/amazonlinux-gdal:2.4.0
 
-# Install apt dependencies
-RUN yum install -y \
-  gcc gcc-c++ freetype-devel yum-utils findutils openssl-devel
+WORKDIR /tmp
 
-RUN yum -y groupinstall development
+ENV PACKAGE_PREFIX /tmp/python
 
-RUN curl https://www.python.org/ftp/python/3.6.1/Python-3.6.1.tar.xz | tar -xJ \
-    && cd Python-3.6.1 \
-    && ./configure --prefix=/usr/local --enable-shared \
-    && make \
-    && make install \
-    && cd .. \
-    && rm -rf Python-3.6.1
+COPY setup.py setup.py
+COPY tiler/ tiler/
 
-ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+# Install dependencies
+RUN pip3 install . --no-binary numpy,rasterio -t $PACKAGE_PREFIX -U
 
-RUN pip3 install numpy wheel cython --no-binary numpy
-
-# Install Python dependencies
-RUN pip3 install rio-tiler==1.0a.0 lambda_proxy numexpr rio-rgbify --no-binary numpy -t /tmp/vendored -U
-
-# Reduce Lambda package size to fit the 250Mb limit
-# Mostly based on https://github.com/jamesandersen/aws-machine-learning-demo
-RUN du -sh /tmp/vendored
-
-# This is the list of available modules on AWS lambda Python 3
-# ['boto3', 'botocore', 'docutils', 'jmespath', 'pip', 'python-dateutil', 's3transfer', 'setuptools', 'six']
-RUN find /tmp/vendored -name "*-info" -type d -exec rm -rdf {} +
-RUN rm -rdf /tmp/vendored/boto3/
-RUN rm -rdf /tmp/vendored/botocore/
-RUN rm -rdf /tmp/vendored/docutils/
-RUN rm -rdf /tmp/vendored/dateutil/
-RUN rm -rdf /tmp/vendored/jmespath/
-RUN rm -rdf /tmp/vendored/s3transfer/
-RUN rm -rdf /tmp/vendored/numpy/doc/
+################################################################################
+#                            REDUCE PACKAGE SIZE                               #
+################################################################################
+RUN find $PACKAGE_PREFIX -name "*-info" -type d -exec rm -rdf {} +
+RUN rm -rdf $PACKAGE_PREFIX/boto3/ \
+  && rm -rdf $PACKAGE_PREFIX/botocore/ \
+  && rm -rdf $PACKAGE_PREFIX/docutils/ \
+  && rm -rdf $PACKAGE_PREFIX/dateutil/ \
+  && rm -rdf $PACKAGE_PREFIX/jmespath/ \
+  && rm -rdf $PACKAGE_PREFIX/s3transfer/ \
+  && rm -rdf $PACKAGE_PREFIX/numpy/doc/
 
 # Leave module precompiles for faster Lambda startup
-RUN find /tmp/vendored -type f -name '*.pyc' | while read f; do n=$(echo $f | sed 's/__pycache__\///' | sed 's/.cpython-36//'); cp $f $n; done;
-RUN find /tmp/vendored -type d -a -name '__pycache__' -print0 | xargs -0 rm -rf
-RUN find /tmp/vendored -type f -a -name '*.py' -print0 | xargs -0 rm -f
+RUN find $PACKAGE_PREFIX -type f -name '*.pyc' | while read f; do n=$(echo $f | sed 's/__pycache__\///' | sed 's/.cpython-36//'); cp $f $n; done;
+RUN find $PACKAGE_PREFIX -type d -a -name '__pycache__' -print0 | xargs -0 rm -rf
+RUN find $PACKAGE_PREFIX -type f -a -name '*.py' -print0 | xargs -0 rm -f
 
-RUN du -sh /tmp/vendored
+RUN cd $PREFIX && find lib -name \*.so\* -exec strip {} \;
+RUN cd $PREFIX && find lib64 -name \*.so\* -exec strip {} \;
 
-COPY app /tmp/vendored/app
-
-# Create archive
-RUN cd /tmp/vendored && zip -r9q /tmp/package.zip *
-
-# Cleanup
-RUN rm -rf /tmp/vendored/
+################################################################################
+#                              CREATE ARCHIVE                                  #
+################################################################################
+RUN cd $PACKAGE_PREFIX && zip -r9q /tmp/package.zip *
+RUN cd $PREFIX && zip -r9q --symlinks /tmp/package.zip lib/*.so*
+RUN cd $PREFIX && zip -r9q --symlinks /tmp/package.zip lib64/*.so*
+RUN cd $PREFIX && zip -r9q /tmp/package.zip share
